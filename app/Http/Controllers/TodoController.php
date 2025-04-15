@@ -1,10 +1,10 @@
 <?php
 
 namespace App\Http\Controllers;
+use App\Http\Controllers\Controller;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Todo;
 
@@ -46,60 +46,53 @@ class TodoController extends Controller
     }
 
     public function exportExcel(Request $request)
-{
-    $query = Todo::query();
+    {
+        $query = Todo::query();
 
-    // untuk filter export
-    if ($request->has('status')) {
-        $query->where('status', $request->status);
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->has('priority')) {
+            $query->where('priority', $request->priority);
+        }
+
+        $todos = $query->get([
+            'title', 'assignee', 'due_date', 'time_tracked', 'status', 'priority', 'created_at', 'updated_at'
+        ]);
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $headers = ['Title', 'Assignee', 'Due Date', 'Time Tracked', 'Status', 'Priority', 'Created At', 'Updated At'];
+        $sheet->fromArray($headers, null, 'A1');
+
+        $row = 2;
+        foreach ($todos as $todo) {
+            $sheet->fromArray([
+                $todo->title,
+                $todo->assignee,
+                $todo->due_date,
+                $todo->time_tracked,
+                $todo->status,
+                $todo->priority,
+                $todo->created_at,
+                $todo->updated_at,
+            ], null, "A{$row}");
+            $row++;
+        }
+
+        $fileName = 'todos_' . now()->format('Ymd_His') . '.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Cache-Control' => 'max-age=0',
+        ]);
     }
 
-    if ($request->has('priority')) {
-        $query->where('priority', $request->priority);
-    }
-
-    $todos = $query->get([
-        'id', 'title', 'assignee', 'due_date', 'time_tracked', 'status', 'priority', 'created_at', 'updated_at'
-    ]);
-
-    // Buat Spreadsheet
-    $spreadsheet = new Spreadsheet();
-    $sheet = $spreadsheet->getActiveSheet();
-
-    // Header
-    $headers = ['Title', 'Assignee', 'Due Date', 'Time Tracked', 'Status', 'Priority', 'Created At', 'Updated At'];
-    $sheet->fromArray($headers, null, 'A1');
-
-    // Data
-    $row = 2;
-    foreach ($todos as $todo) {
-        $sheet->fromArray([
-            $todo->title,
-            $todo->assignee,
-            $todo->due_date,
-            $todo->time_tracked,
-            $todo->status,
-            $todo->priority,
-            $todo->created_at,
-            $todo->updated_at,
-        ], null, "A{$row}");
-        $row++;
-    }
-
-    // Output ke browser
-    $fileName = 'todos_' . now()->format('Ymd_His') . '.xlsx';
-    $writer = new Xlsx($spreadsheet);
-
-    // Simpan ke memory
-    $response = new StreamedResponse(function () use ($writer) {
-        $writer->save('php://output');
-    });
-
-    $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    $response->headers->set('Content-Disposition', 'attachment;filename="' . $fileName . '"');
-    $response->headers->set('Cache-Control', 'max-age=0');
-
-    return $response;
-}
 
 }

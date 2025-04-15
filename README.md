@@ -5,6 +5,7 @@
 
 2. Export Excel (otomatis masuk ke file download)
     ![alt text](image-1.png)
+    ![alt text](image-5.png)
 
 3. Chart 
     3.1 Chart by Status
